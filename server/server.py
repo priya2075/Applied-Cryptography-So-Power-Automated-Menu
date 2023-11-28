@@ -1,10 +1,10 @@
 """
 
         SERVER
-        FOR ACG ASSIGNMENT 2
+        FOR ACG GROUP ASSIGNMENT 2
         DICS CLASS 1 / 2023
         Date: 24/07/2023
-        Coded by Priya d/o Manoharan
+        Coded by: Priya d/o Manoharan
 
 """
 
@@ -39,20 +39,21 @@ from Crypto.PublicKey import RSA
 #-------------------------------------------------------------------------------------- Global variables
 host = '0.0.0.0' # socket.gethostname()
 port = 8888
-cmd_GET_MENU = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGING\\server\\menu_today.txt"
-cmd_END_DAY = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGING\\client\\day_end.csv"
-default_menu = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\menu_today.txt"
-default_save_base = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\Result\day_end.csv"
+cmd_GET_MENU = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGINGrrr\\server\\menu_today.txt"
+cmd_END_DAY = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGINGrrr\\client\\day_end.csv"
+default_menu = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\menu_today.txt"
+default_save_base = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\Result\day_end.csv"
 
 key = b'\xa9\xb5\x01\x87c]\x8e\xd5Ue3\x8dO\x7f\x91\xc8' # 16 byte (fixed) instead of random - due to testing this program
 hmac_key = b'abed631a0aadd9dfdc0787f6ae9405b2bfc52f8e50c7e0a7b0d88f2f8bfe81dd255ed98dbe55eb89101f84fad0097c248fc1ab2f4fa6c7dbd6f5454257093b1f' # HMAC key - fixed for testing purposes
-iv = b'\xbb(\xbf"\xd8Zx\x8b\xfe.!D\xa4\xf9v\xa7'
+fixed_iv = b'\xbb(\xbf"\xd8Zx\x8b\xfe.!D\xa4\xf9v\xa7'
+iv = fixed_iv
 MAX_BUFFER_SIZE = 4096
-
+cipher = AES.new(key, AES.MODE_CBC, iv) 
 
 # ------------------------------------------------------------------------------------- KEYS
 # Change the working directory to the desired location
-os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\sKeys\RSA')
+os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\sKeys\RSA')
 client_public_key = RSA.import_key(open('client_public.pem').read()) # Import the client's public key
 private_key = RSA.import_key(open('server_private.pem').read()) # Import the server's private key
 server_public_key = RSA.import_key(open('server_public.pem').read()) 
@@ -62,7 +63,7 @@ clear()
 
 
 # ------------------------------------------------------------------------------------- Server Logging
-server_log_folder = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\server_logs"
+server_log_folder = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\server_logs"
 os.makedirs(server_log_folder, exist_ok=True)
 log_file = os.path.join(server_log_folder, "server_logging.txt")
 
@@ -129,7 +130,7 @@ def process_connection(conn, ip_addr, MAX_BUFFER_SIZE, connections_complete):
 
             elif cmd_END_DAY.decode().strip() == usr_cmd:
                 # Specify the folder path
-                folder_path = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\Result"
+                folder_path = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\Result"
 
                 # Create the folder if it doesn't exist
                 os.makedirs(folder_path, exist_ok=True)
@@ -176,12 +177,12 @@ def process_connection(conn, ip_addr, MAX_BUFFER_SIZE, connections_complete):
     if dest_file:
         dest_file.close()
         connections_complete[ip_addr][0] = True
-        data_to_process = received_data[len(cmd_END_DAY):]
-        process_end_day_data(data_to_process, ip_addr)  
+        encrypted_data = received_data[len(cmd_END_DAY):]
+        process_end_day_data(encrypted_data, ip_addr)  
 
 
 #-------------------------------------------------------------------------------------- Vefify HMAC and decrypt data
-def verify_and_decrypt_data(encrypted_data):
+def verify_and_decrypt_data(encrypted_data, client_public_key):
     try:
         # Verify HMAC
         received_hmac = encrypted_data[:32]
@@ -189,23 +190,43 @@ def verify_and_decrypt_data(encrypted_data):
         computed_hmac = hmac.new(hmac_key, encrypted_data_with_signature, hashlib.sha256).digest()
         received_checksum = encrypted_data_with_signature[-32:]
         computed_checksum = hashlib.sha256(encrypted_data_with_signature[:-32]).digest()
-        
-        print("")
+
+        # Print intermediate values for debugging
         print("-- Received Checksum from Client:", received_checksum.hex())
         print("-- Received HMAC from Client:", received_hmac.hex())
-        print("")
-        print("-- Computed Checksum:", computed_checksum.hex())
-        print("-- Computed HMAC within verify_and_decrypt_data:", computed_hmac.hex())     
-        print("")
+        logging.info("-- Received Checksum from Client: %s", received_checksum.hex())
+        logging.info("-- Received HMAC from Client: %s", received_hmac.hex())
+        print("--> Computed Checksum within verify_and_decrypt_data:", computed_checksum.hex())
+        print("--> Computed HMAC within verify_and_decrypt_data:", computed_hmac.hex())
+        logging.info("--> Computed Checksum within verify_and_decrypt_data: %s", computed_checksum.hex())
+        logging.info("--> Computed HMAC within verify_and_decrypt_data: %s", computed_hmac.hex())
 
         if hmac.compare_digest(computed_hmac, received_hmac):
             # HMAC verification successful
             # Continue with decryption since HMAC and checksum verification passed
-
             # Decrypt the data using AES-CBC mode with padding
-            iv = encrypted_data[:16]
-            encrypted_data = encrypted_data[16:]
-            cipher = AES.new(key, AES.MODE_CBC, iv)
+            received_iv = encrypted_data[32: 32 + AES.block_size]  # Extract the received IV
+            encrypted_data = encrypted_data[32 + AES.block_size:]
+            cipher = AES.new(key, AES.MODE_CBC, received_iv)
+
+            # Perform length check
+            expected_length = len(received_hmac) + AES.block_size + len(signature)
+            print(f"Expected length: {expected_length}")
+            print(f"Actual length: {len(encrypted_data_with_signature)}")
+            if len(encrypted_data_with_signature) != expected_length:
+                raise ValueError("Incorrect length of encrypted_data_with_signature.")
+
+            # Verify byte sequence order
+            received_hmac_check = encrypted_data_with_signature[:len(received_hmac)]
+            signature_check = encrypted_data_with_signature[-len(signature):]
+            print(f"Received HMAC Check: {received_hmac_check.hex()}")
+            print(f"Expected HMAC: {received_hmac.hex()}")
+            print(f"Signature Check: {signature_check.hex()}")
+            print(f"Expected Signature: {signature.hex()}")
+            if received_hmac_check != received_hmac or signature_check != signature:
+                raise ValueError("Incorrect byte sequence order in encrypted_data_with_signature.")
+
+            # Perform padding check (if applicable)
             decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
 
             print(">> Decrypted data within verify_and_decrypt_data:", decrypted_data)  # Debugging print
@@ -215,8 +236,8 @@ def verify_and_decrypt_data(encrypted_data):
             original_data = decrypted_data[:-256]
             signature = decrypted_data[-256:]
 
-            # Verify the signature using the server's public key
-            verifier = pkcs1_15.new(server_public_key)
+            # Verify the signature using the client's public key
+            verifier = pkcs1_15.new(client_public_key)
             digest = SHA256.new(original_data)
             if verifier.verify(digest, signature):
                 print(">> Verifying signature... Signature verification successful. Data is authentic.")
@@ -232,13 +253,16 @@ def verify_and_decrypt_data(encrypted_data):
             logging.warning(">> Integrity check failed. Data may have been tampered with.")
             # Logging messages with proper formatting
             logging.info("Received HMAC within verify_and_decrypt_data: %s", received_hmac.hex())
-            logging.info("Computed HMAC within verify_and_decrypt_data: %s", computed_hmac.hex())   
+            logging.info("Computed HMAC within verify_and_decrypt_data: %s", computed_hmac.hex())
             return None
 
     except Exception as e:
         print(">> Error during decryption:", str(e))
         logging.error(">> Error during decryption:", str(e))
         return None
+
+
+
 
         
 #-------------------------------------------------------------------------------------- Process day_end.csv decryption
@@ -268,27 +292,38 @@ def process_end_day_data(data, ip_addr):
             logging.warning(">> Warning: !! Due to signature verification failure, data may have been tampered with.")
 
         # Decrypt the data
-        decrypted_data = verify_and_decrypt_data(data)
-        print(">> Decrypted data within process_end_day_data:", decrypted_data) # Print decrypted data to check if it is correct
+        print("\n[+] Before verify_and_decrypt_data() function call")
+        print("-"*68)
+        decrypted_data = verify_and_decrypt_data(encrypted_data, client_public_key)
+        print("[+] After verify_and_decrypt_data() function call")
+        print("-"*68)
 
-        # Save the decrypted data to a file
-        decrypted_folder_path = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\Decrypted"
-        os.makedirs(decrypted_folder_path, exist_ok=True)
-        
-        # Define a file_prefix for the filename
-        file_prefix = "decrypted"
-        decrypted_filename = os.path.join(
-            decrypted_folder_path,
-            file_prefix + " - " + ip_addr.replace(":", "_") + " - " + datetime.datetime.now().strftime("D_%d-%m-%Y_T_%H-%M-%S") + ".csv"
-        )
-        with open(decrypted_filename, "wb") as decrypted_dest_file:
-            decrypted_dest_file.write(decrypted_data)
+        if decrypted_data is not None:
+            print(">> Decrypted data within process_end_day_data:", decrypted_data) # Print decrypted data to check if it is correct
 
-        print("\n>> Decrypted data saved as\n- ", decrypted_filename)
-        logging.info("Decrypted data saved as " + decrypted_filename)
+            # Save the decrypted data to a file
+            decrypted_folder_path = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\Decrypted"
+            os.makedirs(decrypted_folder_path, exist_ok=True)
+            
+            # Define a file_prefix for the filename
+            file_prefix = "decrypted"
+            decrypted_filename = os.path.join(
+                decrypted_folder_path,
+                file_prefix + " - " + ip_addr.replace(":", "_") + " - " + datetime.datetime.now().strftime("D_%d-%m-%Y_T_%H-%M-%S") + ".csv"
+            )
+            with open(decrypted_filename, "wb") as decrypted_dest_file:
+                decrypted_dest_file.write(decrypted_data)
+
+            print("\n>> Decrypted data saved as\n- ", decrypted_filename)
+            logging.info("Decrypted data saved as " + decrypted_filename)
+            
+        else:
+            print(">> Decryption or verification failed. Data may have been tampered with.")
+            logging.warning(">> Decryption or verification failed. Data may have been tampered with.")
     except Exception as e:
         print(">> Error while processing end-of-day data:", str(e))
         logging.error(f">> Error while processing end-of-day data: {str(e)}")
+
 
 
 #-------------------------------------------------------------------------------------- Client thread with SSL/TLS
@@ -299,7 +334,7 @@ def client_thread(conn, ip, port, MAX_BUFFER_SIZE, connections_complete):
 
     try:
         # Change the working directory to the client folder
-        os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\server\sKeys')
+        os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\server\sKeys')
 
         # Establish SSL/TLS connection
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
