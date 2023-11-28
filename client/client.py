@@ -4,7 +4,7 @@
         FOR ACG ASSIGNMENT 2
         DICS CLASS 1 / 2023
         Date: 24/07/2023
-        Coded by Priya d/o Manoharan
+        Coded by: Priya d/o Manoharan
         
 """
 
@@ -38,19 +38,20 @@ from Crypto.PublicKey import RSA
 global host, port
 host = '127.0.0.1' # socket.gethostname()
 port = 8888
-cmd_GET_MENU = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGING\\server\\menu_today.txt"
-cmd_END_DAY = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGING\\client\\day_end.csv"
-default_menu_file = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\client\menu_rcv\menu.csv"
-return_file = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\client\day_end.csv"
+cmd_GET_MENU = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGINGrrr\\server\\menu_today.txt"
+cmd_END_DAY = b"D:\\02. Tue - IT8084 - Applied Cryptography\\WITHLOGGINGrrr\\client\\day_end.csv"
+default_menu_file = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\client\menu_rcv\menu.csv"
+return_file = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\client\day_end.csv"
 
 key = b'\xa9\xb5\x01\x87c]\x8e\xd5Ue3\x8dO\x7f\x91\xc8' # 16 byte (fixed) instead of random - due to testing this program
 hmac_key = b'abed631a0aadd9dfdc0787f6ae9405b2bfc52f8e50c7e0a7b0d88f2f8bfe81dd255ed98dbe55eb89101f84fad0097c248fc1ab2f4fa6c7dbd6f5454257093b1f' # HMAC key - fixed for testing purposes
-iv = b'\xbb(\xbf"\xd8Zx\x8b\xfe.!D\xa4\xf9v\xa7'
+fixed_iv = b'\xbb(\xbf"\xd8Zx\x8b\xfe.!D\xa4\xf9v\xa7'
+iv = fixed_iv
 MAX_BUFFER_SIZE = 4096
-
+cipher = AES.new(key, AES.MODE_CBC, iv) 
 
 # ------------------------------------------------------------------------------------- SSL / TLS
-os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\client\cKeys') 
+os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\client\cKeys') 
 context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
 context.load_cert_chain(certfile='client.crt', keyfile='client.key')
 context.check_hostname = False #--- This needs to be set to TRUE in a secure and trusted environment.
@@ -59,9 +60,9 @@ context.verify_mode = ssl.CERT_NONE #--- this is disabled as it is in a producti
 
 # ------------------------------------------------------------------------------------- KEYS
 # Change the working directory to the desired location
-os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\client\cKeys\RSA')
+os.chdir(r'D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\client\cKeys\RSA')
 server_public_key = RSA.import_key(open('server_public.pem').read()) # Import the server public key
-private_key = RSA.import_key(open('client_private.pem').read()) # Import the client private key
+client_private_key = RSA.import_key(open('client_private.pem').read()) # Import the client private key
 # from Nigel
 clear = lambda: os.system('cls')
 clear()
@@ -97,7 +98,7 @@ def sync_time_with_ntp():
 
 
 # ------------------------------------------------------------------------------------- Client Logging
-client_log_folder = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\client\client_logs"
+client_log_folder = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\client\client_logs"
 os.makedirs(client_log_folder, exist_ok=True)
 log_file = os.path.join(client_log_folder, "client_logging.txt")
 logging.basicConfig(
@@ -132,7 +133,7 @@ def receive_menu_from_server():
                     decrypted_menu = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
 
                     # Specify the folder path
-                    folder_path = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGING\client\menu_rcv"
+                    folder_path = r"D:\02. Tue - IT8084 - Applied Cryptography\WITHLOGGINGrrr\client\menu_rcv"
 
                     # Create the folder if it doesn't exist
                     os.makedirs(folder_path, exist_ok=True)
@@ -187,8 +188,8 @@ def send_order_to_server():
                 encrypted_data = cipher.encrypt(padded_data)
 
                 # Sign the encrypted data
-                hash_obj = SHA256.new(day_closing_data)
-                signer = pkcs1_15.new(private_key)
+                hash_obj = SHA256.new(encrypted_data)
+                signer = pkcs1_15.new(client_private_key)
                 signature = signer.sign(hash_obj)
                 encrypted_data_with_signature = encrypted_data + signature
 
@@ -202,6 +203,7 @@ def send_order_to_server():
 
                 print("\n>> Sale of the day SENT to server")
                 print(" - Command Requested:", cmd_END_DAY)
+                print(">> Hash object - encrypted csv:", hash_obj.hexdigest())
                 print(" - Checksum:", checksum.hex())
                 print(f" - Computed HMAC value: {hmac_data.hex()}")
                 print(" - IV bytes:", iv)
